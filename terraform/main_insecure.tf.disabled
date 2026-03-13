@@ -1,0 +1,67 @@
+# ═════════════════════════════════════════════════════════════
+# INTENTIONALLY INSECURE TERRAFORM
+# This exists to demonstrate what Checkov catches.
+# DO NOT deploy this. It is for pipeline demo purposes only.
+# ═════════════════════════════════════════════════════════════
+
+
+data "aws_caller_identity" "current" {}
+
+
+resource "random_id" "suffix" {
+  byte_length = 4
+}
+
+
+# ─── ISSUE 1: S3 bucket with no encryption ────────────────
+# Checkov: CKV_AWS_145 (S3 default encryption with KMS)
+# Checkov: CKV2_AWS_6 (S3 public access block)
+# Checkov: CKV_AWS_21 (S3 versioning)
+# Checkov: CKV_AWS_18 (S3 access logging)
+resource "aws_s3_bucket" "data" {
+  bucket = "cicd-insecure-data-${random_id.suffix.hex}"
+  tags   = { Name = "insecure-bucket" }
+  # MISSING: encryption
+  # MISSING: versioning
+  # MISSING: public access block
+  # MISSING: access logging
+  # MISSING: bucket policy denying unencrypted transport
+  # MISSING: lifecycle configuration
+}
+
+
+# ─── ISSUE 2: Security group with SSH open to the world ───
+# Checkov: CKV_AWS_24 (No public SSH)
+resource "aws_security_group" "bad" {
+  name_prefix = "insecure-"
+  description = "Intentionally overly permissive for demo"
+
+
+  ingress {
+    description = "SSH from EVERYWHERE - this is the problem"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]  # WIDE OPEN
+  }
+
+
+  ingress {
+    description = "RDP from EVERYWHERE - also bad"
+    from_port   = 3389
+    to_port     = 3389
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]  # WIDE OPEN
+  }
+
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+
+  tags = { Name = "insecure-sg" }
+}

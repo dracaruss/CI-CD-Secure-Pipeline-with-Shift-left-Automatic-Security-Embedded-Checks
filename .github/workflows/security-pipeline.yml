@@ -1,0 +1,150 @@
+name: Zero-Trust Security Pipeline
+
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+
+permissions:
+  contents: read
+  pull-requests: write
+
+
+jobs:
+  # ─────────────────────────────────────────────────────────
+  # JOB 1: Compliance & Structure Check
+  # ─────────────────────────────────────────────────────────
+  compliance-check:
+    name: 🔍 Structure Compliance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # Pinned v4.2.2
+      
+      - name: Verify Terraform Folder Structure
+        run: |
+          if [ ! -d "terraform" ]; then
+            echo "ERROR: 'terraform/' directory not found!"
+            exit 1
+          fi
+
+
+  # ─────────────────────────────────────────────────────────
+  # JOB 2: Secrets Scanning (Pinned SHA)
+  # ─────────────────────────────────────────────────────────
+  secrets-scan:
+    name: Secrets Audit
+    needs: compliance-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # Pinned v4.2.2
+        with:
+          fetch-depth: 0 
+
+
+      - name: TruffleHog Secrets Scan
+        # PINNED: Using a specific verified SHA for TruffleHog
+        uses: trufflesecurity/trufflehog@945f7c39058b764b855260178385750800d9841c 
+        with:
+          extra_args: --only-verified
+
+
+  # ─────────────────────────────────────────────────────────
+  # JOB 3: IaC Security Scan (Checkov)
+  # ─────────────────────────────────────────────────────────
+  iac-scan:
+    name: IaC Analysis
+    needs: compliance-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # Pinned v4.2.2
+
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@11277a83d4732b13778a87b3378398e404f55ec5 # Pinned v12.2963.0
+        with:
+          directory: terraform/
+          framework: terraform
+          soft_fail: false
+          skip_check: CKV_AWS_144,CKV2_AWS_62
+
+
+  # ─────────────────────────────────────────────────────────
+  # JOB 4: Terraform Check and Post as PR Comment
+  # ─────────────────────────────────────────────────────────
+  terraform-quality-and-plan:
+    name: TF Quality & Plan
+    needs: compliance-check
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # Pinned v4.2.2
+
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@b221b194cf2db724b74542d9426f494c86e64175 # Pinned v3.1.2
+        with:
+          terraform_version: "1.7.0"
+
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init -backend=false
+
+
+      - name: Terraform Format Check
+        working-directory: terraform
+        run: terraform fmt -check -recursive
+
+
+      - name: Terraform Validate
+        working-directory: terraform
+        run: terraform validate
+
+
+      - name: Terraform Plan
+        if: github.event_name == 'pull_request'
+        id: plan
+        working-directory: terraform
+        run: |
+          terraform plan -no-color -input=false > plan_output.txt
+          cat plan_output.txt
+
+
+      - name: Post Plan to PR
+        if: github.event_name == 'pull_request'
+        # PINNED: actions/github-script v7.0.1
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea 
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('terraform/plan_output.txt', 'utf8');
+            const output = `#### Terraform Plan 📖
+            <details><summary>Show Plan</summary>
+
+
+            \`\`\`hcl
+            ${plan}
+            \`\`\`
+
+
+            </details>
+
+
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
