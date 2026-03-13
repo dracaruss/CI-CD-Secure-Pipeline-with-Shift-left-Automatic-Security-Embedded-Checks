@@ -82,10 +82,19 @@ jobs:
     needs: compliance-check
     runs-on: ubuntu-latest
     permissions:
+      id-token: write
+      contents: read
       pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # Pinned v4.3.1
+
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        with:
+          role-to-assume: arn:aws:iam::420536191917:role/github-actions-terraform-dracaruss
+          aws-region: us-east-2
 
 
       - name: Setup Terraform
