@@ -80,6 +80,7 @@ jobs:
   terraform-quality-and-plan:
     name: TF Quality & Plan
     needs: compliance-check
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -119,7 +120,6 @@ jobs:
 
 
       - name: Terraform Plan
-        if: github.event_name == 'pull_request'
         id: plan
         working-directory: terraform
         run: |
@@ -128,7 +128,6 @@ jobs:
 
 
       - name: Post Plan to PR
-        if: github.event_name == 'pull_request'
         # PINNED: actions/github-script v7.0.1
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea 
         with:
