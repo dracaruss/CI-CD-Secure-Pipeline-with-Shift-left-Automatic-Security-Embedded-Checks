@@ -5,7 +5,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches: ["**"]
 
 
 permissions:
@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # Pinned v4.2.2
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # Pinned v4.3.1
       
       - name: Verify Terraform Folder Structure
         run: |
@@ -41,14 +41,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # Pinned v4.2.2
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # Pinned v4.3.1
         with:
           fetch-depth: 0 
 
 
       - name: TruffleHog Secrets Scan
         # PINNED: Using a specific verified SHA for TruffleHog
-        uses: trufflesecurity/trufflehog@945f7c39058b764b855260178385750800d9841c 
+        uses: trufflesecurity/trufflehog@6c05c4a00b91aa542267d8e32a8254774799d68d
         with:
           extra_args: --only-verified
 
@@ -62,11 +62,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # Pinned v4.2.2
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # Pinned v4.3.1
 
 
       - name: Run Checkov
-        uses: bridgecrewio/checkov-action@11277a83d4732b13778a87b3378398e404f55ec5 # Pinned v12.2963.0
+        uses: bridgecrewio/checkov-action@f9b0a2206b0401cad02ac0a66be2a7934a5be838 # Pinned v12.1347.0
         with:
           directory: terraform/
           framework: terraform
@@ -80,16 +80,26 @@ jobs:
   terraform-quality-and-plan:
     name: TF Quality & Plan
     needs: compliance-check
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
+      id-token: write
+      contents: read
       pull-requests: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # Pinned v4.2.2
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # Pinned v4.3.1
+
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        with:
+          role-to-assume: arn:aws:iam::420536191917:role/github-actions-terraform-dracaruss
+          aws-region: us-east-2
 
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@b221b194cf2db724b74542d9426f494c86e64175 # Pinned v3.1.2
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # Pinned v3.1.2
         with:
           terraform_version: "1.7.0"
 
@@ -110,7 +120,6 @@ jobs:
 
 
       - name: Terraform Plan
-        if: github.event_name == 'pull_request'
         id: plan
         working-directory: terraform
         run: |
@@ -119,7 +128,6 @@ jobs:
 
 
       - name: Post Plan to PR
-        if: github.event_name == 'pull_request'
         # PINNED: actions/github-script v7.0.1
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea 
         with:

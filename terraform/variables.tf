@@ -3,10 +3,3 @@ variable "aws_region" {
   type        = string
   default     = "us-east-2"
 }
-
-
-variable "aws_profile" {
-  description = "AWS CLI profile name"
-  type        = string
-  default     = "cicd"
-}
