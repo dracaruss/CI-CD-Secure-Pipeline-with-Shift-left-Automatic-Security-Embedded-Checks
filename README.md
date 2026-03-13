@@ -1,30 +1,31 @@
 # Overview
+### A GitHub Actions Automatic Security Pipeline.  
+***The security checks trigger on every push and every pull request to the repo.***
 > [!IMPORTANT]
-> A GitHub Actions automatic security pipeline that triggers security checks on every push to the repo and on every pull request.
-> ##
-Before code can merge to main, an additional check runs terraform plan against AWS using OIDC federation — no stored credentials, no long-lived keys.
+> Before code can merge to main, an additional check runs terraform plan against AWS using OIDC federation — no stored credentials, no long-lived keys.
 This project demonstrates shift-left security practices using infrastructure-as-code scanning, secrets detection, Terraform validation, and secure AWS authentication via OIDC.  
 
+##
+
 # What the Pipeline Automatically Checks 
-> [!CAUTION]
-> ### ***Secrets Scanning***  
+
+### ***Secrets Scanning***  
 *Tool Used*: TruffleHog  
-Full checks on security misconfigurations on AWS keys, passwords, API tokens etc. in code or git history.  
+>Full checks on security misconfigurations on AWS keys, passwords, API tokens etc. in code or git history.  
 
-> [!CAUTION]
-> ### ***IaC Scanning*** 
+### ***IaC Scanning***  
 *Tool Used*: Checkov  
-Full comprehensive checks via Checkov  
+>Full comprehensive checks via Checkov  
 
-> [!CAUTION]
-> ### ***Syntax Validation***
+### ***Syntax Validation***
 *Tool Used*: Terraform  
-Invalid HCL, formatting issues, provider errors
+>Invalid HCL, formatting issues, provider errors
 
-> [!CAUTION]
-> ### ***Terraform Plan***
+### ***Terraform Plan***  
 *Tool Used*: Terraform + AWS OIDC  
-Infrastructure changes reviewed before merge.  
+>Infrastructure changes reviewed before merge.  
+
+## 
 
 # Supply Chain Security  
 All GitHub Actions are pinned to SHA hashes instead of version tags. Version tags are mutable — a compromised repo could move a tag to point to malicious code. SHA hashes are immutable and guarantee you're running the exact code you reviewed.  
@@ -39,63 +40,74 @@ uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 ```
 
 # AWS Authentication (OIDC Federation)  
-This pipeline uses OpenID Connect (OIDC) to authenticate GitHub Actions with AWS — no access keys or secrets stored anywhere.
-How it works:
+***This pipeline uses OpenID Connect (OIDC) to authenticate GitHub Actions with AWS — no access keys or secrets stored anywhere.***  
+1. GitHub Actions requests a short-lived OIDC token from GitHub's identity provider.  
+2. The token is presented to AWS IAM, which verifies it against a pre-configured trust policy.  
+3. AWS returns temporary credentials (valid ~1 hour) scoped to a specific IAM role.  
+4. Terraform uses those credentials to run plan against real infrastructure.  
+<br>
 
-GitHub Actions requests a short-lived OIDC token from GitHub's identity provider
-The token is presented to AWS IAM, which verifies it against a pre-configured trust policy
-AWS returns temporary credentials (valid ~1 hour) scoped to a specific IAM role
-Terraform uses those credentials to run plan against real infrastructure
+***The trust policy is locked down to:***  
+- A single specific repository
+- Only pull request events
+<br>
 
-The trust policy is locked down to:
+*This means even other repos under the same GitHub account cannot assume the role.*  
 
-A single specific repository
-Only pull request events
+##
 
-This means even other repos under the same GitHub account cannot assume the role.
-How to Use
+# How to Use  
+> [!NOTE]
+> * Fork this repository.
+> * Rename main_insecure.tf.disabled to main_insecure.tf.
+> * Remove or rename main.tf.
+> * Push to a branch and create a Pull Request.
+> * Watch Checkov fail with specific findings.
+> * Swap back to the secure version.
+> * Push again and watch the pipeline pass.  
 
-Fork this repository
-Rename main_insecure.tf.disabled to main_insecure.tf
-Remove or rename main.tf
-Push to a branch and create a Pull Request
-Watch Checkov fail with specific findings
-Swap back to the secure version
-Push again and watch the pipeline pass
+##
 
-To enable the Terraform Plan step in your fork:
+# To enable the Terraform Plan, Add this step in your fork:  
+> [!IMPORTANT]
+> 1. Create an OIDC Identity Provider in your AWS account for token.actions.githubusercontent.com
+> 2. Create an IAM Role with a trust policy scoped to your fork's repo.
+> 3. Update the role-to-assume ARN in security-pipeline.yml.
+> 4. Open a PR and the plan will run automatically.  
 
-Create an OIDC Identity Provider in your AWS account for token.actions.githubusercontent.com
-Create an IAM Role with a trust policy scoped to your fork's repo
-Update the role-to-assume ARN in security-pipeline.yml
-Open a PR and the plan will run automatically
+##
 
-Trade-offs and Design Decisions
-
-soft_fail: false: The pipeline blocks merges on any finding. In a real
-organization, you might start with soft_fail: true (warnings only) and
+# Trade-offs and Design Decisions  
+**soft_fail: false:**  
+> The pipeline blocks merges on any finding. In a real organization, you might start with soft_fail: true (warnings only) and
 tighten over time as the team adapts.
-skip_check: I skipped CKV_AWS_144 (cross-region replication) because
-this is a lab environment where cross-region redundancy isn't needed.
+
+**skip_check:**  
+>I skipped CKV_AWS_144 (cross-region replication) because this is a lab environment where cross-region redundancy isn't needed.
 In production, I would enable it for any bucket containing business data.
-KMS vs SSE-S3: I chose a customer-managed KMS key over SSE-S3 default
-encryption because it gives us audit trail (CloudTrail logs key usage),
-key policy control, and automatic annual rotation. The trade-off is cost
-($1/month per key + $0.03 per 10,000 API calls).
-No Terraform remote state: For this lab, state is local. In production,
-I would use an S3 backend with DynamoDB locking and encryption.
-OIDC over static keys: OIDC federation means no AWS credentials are stored
-in GitHub Secrets. Credentials are temporary, automatically rotated, and
-scoped to the minimum permissions needed.
-SHA-pinned actions: Every third-party action is pinned to a full commit SHA
-rather than a mutable version tag, protecting against supply chain attacks
-like the tj-actions/changed-files incident in early 2025.
 
-What I Would Add in an Enterprise Setting
+**KMS vs SSE-S3:**  
+>I chose a customer-managed KMS key over SSE-S3 default encryption because it gives us audit trail (CloudTrail logs key usage),
+key policy control, and automatic annual rotation. The trade-off is cost: ($1/month per key + $0.03 per 10,000 API calls).
 
-DAST scanning (OWASP ZAP) against a staging deployment
-SCA scanning (Snyk or Trivy) for dependency vulnerabilities
-Separate AWS accounts for dev/staging/prod with cross-account deploy roles
-Manual approval gate before production deployment
-Dependabot or Renovate to automatically update pinned action SHAs
-S3 backend with DynamoDB locking for Terraform remote state
+**No Terraform remote state:**  
+>For this lab, state is local. In production, I would use an S3 backend with DynamoDB locking and encryption.  
+
+**OIDC over static keys:**  
+>OIDC federation means no AWS credentials are stored in GitHub Secrets. Credentials are temporary, automatically rotated, and
+scoped to the minimum permissions needed.  
+
+**SHA-pinned actions:**  
+>Every third-party action is pinned to a full commit SHA rather than a mutable version tag, protecting against supply chain attacks
+like the tj-actions/changed-files incident in early 2025.  
+
+##  
+
+# What I Would Add in an Enterprise Setting
+> [!IMPORTANT]
+> * DAST scanning (OWASP ZAP) against a staging deployment.
+> * SCA scanning (Snyk or Trivy) for dependency vulnerabilities.
+> * Separate AWS accounts for dev/staging/prod with cross-account deploy roles.
+> * Manual approval gate before production deployment.
+> * Dependabot or Renovate to automatically update pinned action SHAs.
+> * S3 backend with DynamoDB locking for Terraform remote state.
