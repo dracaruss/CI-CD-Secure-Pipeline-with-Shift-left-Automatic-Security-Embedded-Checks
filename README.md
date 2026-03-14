@@ -53,7 +53,8 @@ uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 1. GitHub Actions requests a short-lived OIDC token from GitHub's identity provider.  
 2. The token is presented to AWS IAM, which verifies it against a pre-configured trust policy.  
 3. AWS returns temporary credentials (valid ~1 hour) scoped to a specific IAM role.  
-4. Terraform uses those credentials to run plan against real infrastructure.  
+4. Terraform uses those credentials to run plan against real infrastructure.
+<img width="1451" height="537" alt="Image" src="https://github.com/user-attachments/assets/7e267d6a-09e1-4311-8c50-060bfbe17307" />
 <br>
 
 ***The trust policy is locked down to:***  
