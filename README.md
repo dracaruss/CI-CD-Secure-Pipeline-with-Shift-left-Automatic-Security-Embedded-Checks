@@ -29,6 +29,7 @@ This project demonstrates shift-left security practices using infrastructure-as-
 ### ***Terraform Plan***  
 *Tool Used*: Terraform + AWS OIDC  
 >Infrastructure changes reviewed before merge.  
+<img width="1430" height="483" alt="Image" src="https://github.com/user-attachments/assets/e624d969-5f64-41c8-ae3d-f64083aa394d" />
 
 ## 
 
