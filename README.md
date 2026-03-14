@@ -7,6 +7,10 @@ This project demonstrates shift-left security practices using infrastructure-as-
 
 ##
 
+# Architecture Deisgn:  
+
+##
+
 # What the Pipeline Automatically Checks 
 
 ### ***Secrets Scanning***  
