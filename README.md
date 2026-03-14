@@ -72,12 +72,15 @@ uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
 ##
 
-# To enable the Terraform Plan, Add this step in your fork:  
+# To enable the Terraform Plan, add this step in your fork:  
 > [!IMPORTANT]
 > 1. Create an OIDC Identity Provider in your AWS account for token.actions.githubusercontent.com
 > 2. Create an IAM Role with a trust policy scoped to your fork's repo.
 > 3. Update the role-to-assume ARN in security-pipeline.yml.
 > 4. Open a PR and the plan will run automatically.  
+
+*Note:* The Terraform Plan will only trigger on the Pull request, not the Push. It will not enact the last check on the Push:  
+<img width="1255" height="565" alt="Image" src="https://github.com/user-attachments/assets/1e35a8bc-6620-4346-9608-3bbef89d7f0f" />
 
 ##
 
