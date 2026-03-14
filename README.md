@@ -43,6 +43,10 @@ uses: actions/checkout@v4
 # Immutable SHA (secure)
 uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 ```
+<img width="1027" height="422" alt="Image" src="https://github.com/user-attachments/assets/72904587-17a4-4172-b960-0d7352b43df8" />
+
+##
+
 
 # AWS Authentication (OIDC Federation)  
 ***This pipeline uses OpenID Connect (OIDC) to authenticate GitHub Actions with AWS — no access keys or secrets stored anywhere.***  
