@@ -2,7 +2,7 @@
 ### A GitHub Actions Automatic Security Pipeline.  
 ***Four security checks trigger on every push and every pull request to the repo.***
 > [!IMPORTANT]
-> This projects sets up automatic checks to ensure that before code can merge into any repo, it is scanned for vulnerabilities. This setup runs automatically, and is powered by Github Actions, which connects to AWS using OIDC federation — so there are no stored credentials, and no long-lived keys. This project demonstrates shift-left security practices using infrastructure-as-code scanning, secrets detection, Terraform validation, and secure AWS authentication via OIDC.  
+> This projects sets up automatic checks to ensure that before any code can be merged into a repo, it is scanned for vulnerabilities. This setup is powered by Github Actions, which connects to AWS using OIDC federation — so there are no stored credentials, and no long-lived keys. This project demonstrates shift-left security practices using infrastructure-as-code scanning, secrets detection, Terraform validation, and secure AWS authentication via OIDC.  
 
 ##
 
