@@ -8,6 +8,7 @@ This project demonstrates shift-left security practices using infrastructure-as-
 ##
 
 # Architecture Deisgn:  
+<img width="742" height="962" alt="Image" src="https://github.com/user-attachments/assets/fa97c1eb-5157-4afb-b24d-b5eafcda62cf" />
 
 ##
 
