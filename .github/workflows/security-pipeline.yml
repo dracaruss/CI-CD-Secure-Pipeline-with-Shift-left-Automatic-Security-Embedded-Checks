@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   # ─────────────────────────────────────────────────────────
-  # JOB 1: Compliance & Structure Check
+  # JOB 1: Folder Structure Check
   # ─────────────────────────────────────────────────────────
   compliance-check:
     name: 🔍 Structure Compliance
