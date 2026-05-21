@@ -2,25 +2,25 @@
 ### A GitHub Actions Automatic Security Pipeline.  
 ***Four security checks trigger on every push and every pull request to the repo.***
 > [!IMPORTANT]
-> This project sets up automatic checks to ensure that before any code can be merged into a repo, it is scanned for vulnerabilities. This setup is powered by Github Actions, which connects to AWS using OIDC federation — so there are no stored credentials, and no long-lived keys. This project demonstrates shift-left security practices using infrastructure-as-code scanning, secrets detection, Terraform validation, and secure AWS authentication via OIDC.  
+> This project sets up automatic checks to ensure that before any code can be merged into a repo, it is scanned for vulnerabilities. This setup is powered by Github Actions, which connects to AWS using OIDC federation - so there are no stored credentials, and no long-lived keys. This project demonstrates shift-left security practices using infrastructure-as-code scanning, secrets detection, Terraform validation, and secure AWS authentication via OIDC.  
 
-# Shift-Left CI/CD Security Pipeline — Project Execution Run Through
+# Shift-Left CI/CD Security Pipeline - Project Execution Run Through
 
 ## How the project works
 
 The pipeline runs automatically on every PR and push to `main` in the repo, with four parallel jobs that block insecure code from ever reaching production:
 
-**Job 1 — Secrets Scanning (TruffleHog):** Scans the full git history (`fetch-depth: 0`) for verified secrets — real AWS keys, API tokens, passwords — using `--only-verified` to reduce false positives. It actually tries the credentials to confirm they're live.
+**Job 1 - Secrets Scanning (TruffleHog):** Scans the full git history (`fetch-depth: 0`) for verified secrets - real AWS keys, API tokens, passwords - using `--only-verified` to reduce false positives. It actually tries the credentials to confirm they're live.
 
-**Job 2 — IaC Scanning (Checkov):** Runs against the `terraform/` directory with `soft_fail: false`, meaning any finding kills the build. Skipped `CKV_AWS_144` (cross-region replication) and `CKV2_AWS_62` (S3 event notifications) since they weren't relevant for a lab.
+**Job 2 - IaC Scanning (Checkov):** Runs against the `terraform/` directory with `soft_fail: false`, meaning any finding kills the build. Skipped `CKV_AWS_144` (cross-region replication) and `CKV2_AWS_62` (S3 event notifications) since they weren't relevant for a lab.
 
-**Job 3 — Terraform Syntax/Compliance:** `terraform fmt -check`, `terraform validate`, `terraform init -backend=false`. Catches HCL syntax errors, formatting drift, and provider misconfig before they hit AWS.
+**Job 3 - Terraform Syntax/Compliance:** `terraform fmt -check`, `terraform validate`, `terraform init -backend=false`. Catches HCL syntax errors, formatting drift, and provider misconfig before they hit AWS.
 
-**Job 4 — Terraform Plan against real AWS (PR-only):** This is the OIDC-authenticated job. After all other checks pass (`needs: compliance-check`), it assumes an IAM role via OIDC, runs `terraform plan`, and posts the plan output as a PR comment so reviewers see exactly what infrastructure would change before approving the merge.
+**Job 4 - Terraform Plan against real AWS (PR-only):** This is the OIDC-authenticated job. After all other checks pass (`needs: compliance-check`), it assumes an IAM role via OIDC, runs `terraform plan`, and posts the plan output as a PR comment so reviewers see exactly what infrastructure would change before approving the merge.
 
 ## Supply-chain hardening
 
-Every action was **SHA-pinned**, not tag-pinned — `actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1` instead of `@v4`. Version tags are mutable; a compromised upstream repo can repoint `v4` to malicious code. SHA hashes are immutable.
+Every action was **SHA-pinned**, not tag-pinned - `actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1` instead of `@v4`. Version tags are mutable; a compromised upstream repo can repoint `v4` to malicious code. SHA hashes are immutable.
 
 ## OIDC auth for AWS
 
@@ -32,13 +32,13 @@ No static creds anywhere. The flow:
 4. STS returned short-lived creds (~1 hour) scoped to the role `github-actions-terraform-dracaruss`.
 5. Terraform used those creds for the `plan`.
 
-The trust policy was scoped to a single repo — even other repos under `dracaruss` couldn't assume the role.
+The trust policy was scoped to a single repo - even other repos under `dracaruss` couldn't assume the role.
 
 ## Issues hit
 
-**Issue 1 — `Not authorized to perform sts:AssumeRoleWithWebIdentity`**
+**Issue 1 - `Not authorized to perform sts:AssumeRoleWithWebIdentity`**
 
-The TF Plan job kept failing at the `Configure AWS Credentials` step. The OIDC connection itself was working (AWS was receiving the token) — the trust policy was rejecting the claim match. The original trust policy had:
+The TF Plan job kept failing at the `Configure AWS Credentials` step. The OIDC connection itself was working (AWS was receiving the token) - the trust policy was rejecting the claim match. The original trust policy had:
 
 ```
 "token.actions.githubusercontent.com:sub": "repo:dracaruss/CI-CD-...:pull_request"
@@ -54,25 +54,25 @@ with `StringEquals`. The problem: GitHub's actual `sub` claim for PR events is m
 
 This let any event type from that specific repo assume the role, while still rejecting any other repo on the planet.
 
-**Issue 2 — Push events were trying to assume the role even though plan shouldn't run on push**
+**Issue 2 - Push events were trying to assume the role even though plan shouldn't run on push**
 
-The TF Plan step had `if: github.event_name == 'pull_request'`, but `Configure AWS Credentials` didn't — so on every push to main, the credentials step still ran, hit a trust policy that didn't match the push event's sub claim, and failed. **Fix:** moved the `if` condition from the step level to the **job level**, so the entire `terraform-quality-and-plan` job is skipped cleanly on pushes instead of running half-way and failing.
+The TF Plan step had `if: github.event_name == 'pull_request'`, but `Configure AWS Credentials` didn't - so on every push to main, the credentials step still ran, hit a trust policy that didn't match the push event's sub claim, and failed. **Fix:** moved the `if` condition from the step level to the **job level**, so the entire `terraform-quality-and-plan` job is skipped cleanly on pushes instead of running half-way and failing.
 
-**Issue 3 — Inconsistent SHA pinning**
+**Issue 3 - Inconsistent SHA pinning**
 
 Code review caught that `actions/github-script@v7` (used to post the plan as a PR comment) was still tag-pinned while everything else was SHA-pinned. **Fix:** pinned it to commit `60a0d83039c74a4aee543508d2ffcb1c3799cdea`.
 
-**Issue 4 — `terraform plan -backend=false` caveat**
+**Issue 4 - `terraform plan -backend=false` caveat**
 
-The `init` step used `-backend=false`, which means the plan doesn't reflect real state drift — it's a syntax/validation plan, not a true infrastructure plan. Documented this in a comment so future contributors don't assume the plan output reflects actual drift.
+The `init` step used `-backend=false`, which means the plan doesn't reflect real state drift - it's a syntax/validation plan, not a true infrastructure plan. Documented this in a comment so future contributors don't assume the plan output reflects actual drift.
 
-**Issue 5 — PR comment size limit**
+**Issue 5 - PR comment size limit**
 
 GitHub's PR comment body has a ~65,536 char limit. For large plans this would silently truncate. Noted as a known limitation; long-term fix would be to truncate the output or link to the full Actions log.
 
 ## What it demonstrates
 
-This is the shift-left thesis in practice: catch IaC misconfig, leaked secrets, and bad Terraform *at the PR stage*, before merge, before deploy, before production. The OIDC federation piece eliminates the most common CI/CD attack vector — long-lived AWS access keys stored as GitHub secrets — and the SHA-pinning closes the supply-chain attack vector on the actions themselves.
+This is the shift-left thesis in practice: catch IaC misconfig, leaked secrets, and bad Terraform *at the PR stage*, before merge, before deploy, before production. The OIDC federation piece eliminates the most common CI/CD attack vector - long-lived AWS access keys stored as GitHub secrets - and the SHA-pinning closes the supply-chain attack vector on the actions themselves.
 
 ##
 
@@ -103,7 +103,7 @@ This is the shift-left thesis in practice: catch IaC misconfig, leaked secrets, 
 ## 
 
 # Supply Chain Security  
-All GitHub Actions are pinned to SHA hashes instead of version tags. Version tags are mutable — a compromised repo could move a tag to point to malicious code. SHA hashes are immutable and guarantee you're running the exact code you reviewed.  
+All GitHub Actions are pinned to SHA hashes instead of version tags. Version tags are mutable - a compromised repo could move a tag to point to malicious code. SHA hashes are immutable and guarantee you're running the exact code you reviewed.  
 ```
 yaml
 
@@ -119,7 +119,7 @@ uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
 
 # AWS Authentication (OIDC Federation)  
-***This pipeline uses OpenID Connect (OIDC) to authenticate GitHub Actions with AWS — no access keys or secrets stored anywhere.***  
+***This pipeline uses OpenID Connect (OIDC) to authenticate GitHub Actions with AWS - no access keys or secrets stored anywhere.***  
 1. GitHub Actions requests a short-lived OIDC token from GitHub's identity provider.  
 2. The token is presented to AWS IAM, which verifies it against a pre-configured trust policy.  
 3. AWS returns temporary credentials (valid ~1 hour) scoped to a specific IAM role.  
