@@ -102,6 +102,31 @@ This is the shift-left thesis in practice: catch IaC misconfig, leaked secrets, 
 
 ## 
 
+Why re-run the scans on merge? — defense in depth  
+
+Three real reasons, in order of importance:
+1. The PR check tests the feature branch in isolation. The merge tests the actual merged result.
+> When the PR check ran, it scans the feature branch as if it were the only thing that existed. But between when I open the PR and when I click merge, main might have moved. Someone else's PR could have merged in the meantime. My code, combined with their code, might produce a different result than either alone.
+Together, Checkov might flag a misconfiguration that only exists in the merged state. The post-merge scan catches it.
+
+2. Belt-and-suspenders against PR bypass
+> PRs aren't the only way code reaches main. Someone with admin rights can:
+> Push directly to main (git push origin main)
+> Force-push to main
+> Merge without waiting for checks (if branch protection isn't strict)
+> Use the GitHub API to write commits directly
+> 
+> If the only scans run on PRs, any of those bypass routes deliver unscanned code to main. The push-to-main trigger guarantees that whatever lands on main gets scanned, regardless of how it got there. That's the "final guard" idea.
+
+3. Catching tampering between approval and merge
+> A PR can be approved at 2pm and merged at 4pm. In between, someone could push additional commits to the feature branch. GitHub re-runs PR checks on new commits — but the post-merge scan is the last word, scanning exactly what's now sitting on main.
+
+* The trade-off
+> Yes, it's "redundant" compute. You're paying for the same scans twice. For a real org this is cheap — GitHub Actions minutes on ubuntu-latest are essentially free for public repos and cheap for private. The cost of one Checkov run is seconds of CPU; the cost of a misconfigured S3 bucket reaching prod is a breach notification.
+
+##
+
+
 # Supply Chain Security  
 All GitHub Actions are pinned to SHA hashes instead of version tags. Version tags are mutable - a compromised repo could move a tag to point to malicious code. SHA hashes are immutable and guarantee you're running the exact code you reviewed.  
 ```
